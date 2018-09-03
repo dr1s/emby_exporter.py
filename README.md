@@ -4,6 +4,9 @@ A prometheus exporter for emby written in Python 3.
 The exporter scrapes emby's API and exposes prometheus metrics.
 emby_exporter will call the API every 15 seconds by default, this can be adjusted through commandline arguments.
 
+![Grafana Dashboard](grafana_dashboard.png)
+See [grafana_dashboard.json](grafana_dashboard.json)
+
 # Content
 
 - [emby_exporter.py](#embyexporterpy)
