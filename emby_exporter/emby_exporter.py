@@ -42,7 +42,6 @@ class emby_exporter:
                             userid=user_id,
                             pass_uid=True)
         self.emby.update_sync()
-        self.data = dict()
         self.metrics = dict()
         self.info = None
         self.metrics['info'] = Gauge(   'emby_info',
@@ -66,7 +65,28 @@ class emby_exporter:
             'app_version'
         ])
 
+        self.metrics['genres'] = Gauge('emby_genres', 'emby genres', [
+            'type',
+            'genre'
+        ])
+
         self.httpd = None
+
+
+    def parse_genres(self, data):
+        genres = list()
+        genres_stats = dict()
+        for m in data:
+            for g in m.genres:
+                if not g in genres:
+                    genres.append(g)
+                    genres_stats[g] = 1
+                else:
+                    genres_stats[g] += 1
+
+        print(genres_stats)
+        return genres_stats
+
 
     def update_metrics(self):
 
@@ -79,15 +99,17 @@ class emby_exporter:
             self.info['WanAddress'],
             self.info['Id'],
             self.info['OperatingSystem']).set(1)
+
         data = dict()
-        data['movies'] = self.emby.movies_sync
-        data['series'] = self.emby.series_sync
-        data['episodes'] = self.emby.episodes_sync
-        data['albums'] = self.emby.albums_sync
-        data['artists'] = self.emby.artists_sync
-        data['songs'] = self.emby.songs_sync
-        data['devices'] = self.emby.devices_sync
-        for d in data['devices']:
+        data['movies']      = self.emby.movies_sync
+        data['series']      = self.emby.series_sync
+        data['episodes']    = self.emby.episodes_sync
+        data['albums']      = self.emby.albums_sync
+        data['artists']     = self.emby.artists_sync
+        data['songs']       = self.emby.songs_sync
+
+        devices   = self.emby.devices_sync
+        for d in devices:
             self.metrics['devices'].labels(
                 d.name,
                 d.id,
@@ -99,7 +121,13 @@ class emby_exporter:
         for i in data:
             self.metrics['size'].labels(i).set(len(data[i]))
 
-        self.data = data
+        genres = dict()
+        for i in data:
+            genres[i] = self.parse_genres(data[i])
+        for t in genres:
+            if isinstance(genres[t], dict):
+                for g in genres[t]:
+                    self.metrics['genres'].labels(t, g).set(genres[t][g])
 
 
     class _SilentHandler(WSGIRequestHandler):
