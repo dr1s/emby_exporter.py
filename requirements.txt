@@ -1,2 +1,2 @@
-embypy
+git+https://github.com/dr1s/embypy#egg=embypy
 prometheus_client

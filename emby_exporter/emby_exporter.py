@@ -23,6 +23,7 @@
 #   SOFTWARE.
 
 import time
+import warnings
 import argparse
 import threading
 from embypy import Emby
@@ -56,9 +57,19 @@ class emby_exporter:
         self.metrics['size'] = Gauge(   'emby_library_size',
                                         'emby library size',
                                         [ 'type' ])
+        self.metrics['devices'] = Gauge('emby_devices', 'emby devices',[
+            'name',
+            'id',
+            'username',
+            'user_id',
+            'app_name',
+            'app_version'
+        ])
+
         self.httpd = None
 
     def update_metrics(self):
+
         self.emby.update_sync()
         self.info = self.emby.info_sync()
         self.metrics['info'].labels(
@@ -75,11 +86,21 @@ class emby_exporter:
         data['albums'] = self.emby.albums_sync
         data['artists'] = self.emby.artists_sync
         data['songs'] = self.emby.songs_sync
-
+        data['devices'] = self.emby.devices_sync
+        for d in data['devices']:
+            self.metrics['devices'].labels(
+                d.name,
+                d.id,
+                d.last_user_name,
+                d.last_user_id,
+                d.app_name,
+                d.app_version
+            ).set(1)
         for i in data:
             self.metrics['size'].labels(i).set(len(data[i]))
 
         self.data = data
+
 
     class _SilentHandler(WSGIRequestHandler):
         """WSGI handler that does not log requests."""
@@ -106,6 +127,8 @@ class emby_exporter:
 
 
 def main():
+    # Ignore warnings becasue of asyncio
+    warnings.filterwarnings("ignore")
 
     parser = argparse.ArgumentParser(
         description='emby_exporter')

@@ -8,6 +8,9 @@ setup(
     license='MIT',
     description='Export emby metrics for prometheus',
     install_requires=['prometheus_client', 'embypy'],
+    dependency_links=[
+        'git+https://github.com/dr1s/embypy#egg=embypy',
+    ],
     packages=find_packages(),
     include_package_data = True,
     entry_points={'console_scripts': ['emby_exporter=emby_exporter.emby_exporter:main']},

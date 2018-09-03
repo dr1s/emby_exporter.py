@@ -21,20 +21,26 @@ emby_exporter will call the API every 15 seconds by default, this can be adjuste
 
 # Metrics
 
-    # HELP python_info Python platform information
-    # TYPE python_info gauge
-    python_info{implementation="CPython",major="3",minor="7",patchlevel="0",version="3.7.0"} 1.0
-    # HELP emby_info emby info
-    # TYPE emby_info gauge
-    emby_info{id="5924731cb9904e3b9862475bad630a50",local_address="http://192.168.0.5:8096",operating_system="Linux",server_name="rpi3",version="3.5.2.0",wan_address="http://146.128.69.118:8096"} 1.0
-    # HELP emby_library_size emby library size
-    # TYPE emby_library_size gauge
-    emby_library_size{type="movies"} 969.0
-    emby_library_size{type="series"} 141.0
-    emby_library_size{type="episodes"} 8873.0
-    emby_library_size{type="albums"} 0.0
-    emby_library_size{type="artists"} 0.0
-    emby_library_size{type="songs"} 0.0
+- info
+- library_size
+- devices
+
+# Metrics Example
+
+	    # HELP python_info Python platform information
+	    # TYPE python_info gauge
+	    python_info{implementation="CPython",major="3",minor="7",patchlevel="0",version="3.7.0"} 1.0
+	    # HELP emby_info emby info
+	    # TYPE emby_info gauge
+	    emby_info{id="5924731cb9904e3b9862475bad630a50",local_address="http://192.168.0.5:8096",operating_system="Linux",server_name="rpi3",version="3.5.2.0",wan_address="http://146.128.69.118:8096"} 1.0
+	    # HELP emby_library_size emby library size
+	    # TYPE emby_library_size gauge
+	    emby_library_size{type="movies"} 969.0
+	    emby_library_size{type="series"} 141.0
+	    emby_library_size{type="episodes"} 8873.0
+	    emby_library_size{type="albums"} 0.0
+	    emby_library_size{type="artists"} 0.0
+	    emby_library_size{type="songs"} 0.0
 
 # Setup
 
