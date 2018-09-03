@@ -9,9 +9,11 @@ WORKDIR /emby_exporter
 
 COPY . /emby_exporter
 
-RUN virtualenv -p python3 /env && \
+RUN apk add --no-cache gcc python3-dev musl-dev git && \
+    virtualenv -p python3 /env && \
     /env/bin/python3 setup.py install && \
-    rm -rf /emby_exporter
+    rm -rf /emby_exporter && \
+    apk del --no-cache gcc python3-dev musl-dev git
 
 EXPOSE 9312
 
