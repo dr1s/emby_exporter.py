@@ -44,6 +44,7 @@ class emby_exporter:
         self.emby.update_sync()
         self.metrics = dict()
         self.info = None
+        self.count_lists = ['Genres', 'ProductionYear']
         self.metrics['info'] = Gauge(   'emby_info',
                                         'emby info', [
                                             'server_name',
@@ -65,27 +66,82 @@ class emby_exporter:
             'app_version'
         ])
 
-        self.metrics['genres'] = Gauge('emby_genres', 'emby genres', [
-            'type',
-            'genre'
-        ])
+        self.metrics['played'] = Gauge( 'emby_played',
+                                        'emby played item',
+                                        [ 'type' ])
+        self.metrics['favourite'] = Gauge(  'emby_favourite',
+                                            'emby favourite items',
+                                            [ 'type' ])
 
         self.httpd = None
 
+    def count_userdata(self, data, current_data={}):
+        for i in data:
+            if i in ['Played', 'IsFavorite']:
+                if data[i] is True:
+                    if not i.lower() in current_data:
+                        current_data[i.lower()] = 1
+                    else:
+                        current_data[i.lower()] += 1
 
-    def parse_genres(self, data):
-        genres = list()
-        genres_stats = dict()
-        for m in data:
-            for g in m.genres:
-                if not g in genres:
-                    genres.append(g)
-                    genres_stats[g] = 1
+        return current_data
+
+
+    def count_list(self, data, current_data={}):
+        if isinstance(data, list):
+            for i in data:
+                if not i in current_data:
+                    current_data[i] = 1
                 else:
-                    genres_stats[g] += 1
+                    current_data[i] += 1
+        else:
+            if not data in current_data:
+                current_data[data] = 1
+            else:
+                current_data[data] += 1
+        return current_data
 
-        print(genres_stats)
-        return genres_stats
+
+    def count_stats(self, data):
+        stats = dict()
+        stats['user_data'] = dict()
+
+        for m in data:
+            for i in self.count_lists:
+                if not i in stats:
+                    stats[i] = dict()
+
+                if i in m.object_dict:
+                    content = m.object_dict[i]
+
+                    if i in self.count_lists:
+                        stats[i] = self.count_list(content, stats[i])
+
+
+                stats['user_data'] = self.count_userdata(m.object_dict['UserData'], stats['user_data'])
+
+        return stats
+
+    def update_stats(self, data):
+        stats = dict()
+
+        for i in data:
+            stats[i] = self.count_stats(data[i])
+
+        for t in stats:
+            for i in stats[t]:
+                if i == 'user_data':
+                    if 'played' in stats[t]['user_data']:
+                        self.metrics['played'].labels(t).set(stats[t]['user_data']['played'])
+                    if 'isfavourite' in stats[t]['user_data']:
+                        self.metrics['favourite'].labels(t).set(stats[t]['user_data']['isfavourite'])
+                else:
+                    options = [ 'type', i.lower()]
+                    if not i in self.metrics:
+                        self.metrics[i] = Gauge('emby_%s' % i.lower(), 'emby %s' % i, options )
+                    if isinstance(stats[t][i], dict):
+                        for g in stats[t][i]:
+                            self.metrics[i].labels(t, g).set(stats[t][i][g])
 
 
     def update_metrics(self):
@@ -103,10 +159,11 @@ class emby_exporter:
         data = dict()
         data['movies']      = self.emby.movies_sync
         data['series']      = self.emby.series_sync
-        data['episodes']    = self.emby.episodes_sync
+        #data['episodes']    = self.emby.episodes_sync
         data['albums']      = self.emby.albums_sync
         data['artists']     = self.emby.artists_sync
-        data['songs']       = self.emby.songs_sync
+        #data['songs']       = self.emby.songs_sync
+
 
         devices   = self.emby.devices_sync
         for d in devices:
@@ -121,13 +178,7 @@ class emby_exporter:
         for i in data:
             self.metrics['size'].labels(i).set(len(data[i]))
 
-        genres = dict()
-        for i in data:
-            genres[i] = self.parse_genres(data[i])
-        for t in genres:
-            if isinstance(genres[t], dict):
-                for g in genres[t]:
-                    self.metrics['genres'].labels(t, g).set(genres[t][g])
+        self.update_stats(data)
 
 
     class _SilentHandler(WSGIRequestHandler):
