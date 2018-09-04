@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='emby_exporter',
-    version='0.1.dev0',
+    version='0.1',
     url='https://github.com/dr1s/emby_exporter.py',
     author='dr1s',
     license='MIT',

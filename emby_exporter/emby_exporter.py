@@ -30,7 +30,7 @@ from embypy import Emby
 from prometheus_client import Gauge, make_wsgi_app
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-__VERSION__ = '0.1.dev0'
+__VERSION__ = '0.1'
 
 
 class emby_exporter:
