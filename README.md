@@ -27,6 +27,10 @@ See [grafana_dashboard.json](grafana_dashboard.json)
 - info
 - library_size
 - devices
+- genres
+- production year
+- played
+- favourites
 
 # Metrics Example
 
@@ -48,7 +52,7 @@ See [grafana_dashboard.json](grafana_dashboard.json)
 # Setup
 
 ## pip
-    pip3 install --upgrade git+https://github.com/dr1s/emby_exporter.py.git
+    pip3 install --upgrade emby_exporter
 
 ## manual
     git clone https://github.com/dr1s/emby_exporter.py.git
