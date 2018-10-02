@@ -34,44 +34,31 @@ __VERSION__ = '0.1'
 
 
 class emby_exporter:
-
     def __init__(self, url, api_key, user_id):
-        self.emby = Emby(   url,
-                            api_key=api_key,
-                            device_id='emby_exporter',
-                            userid=user_id,
-                            pass_uid=True)
+        self.emby = Emby(
+            url,
+            api_key=api_key,
+            device_id='emby_exporter',
+            userid=user_id,
+            pass_uid=True)
         self.emby.update_sync()
         self.metrics = dict()
         self.info = None
         self.count_lists = ['Genres', 'ProductionYear']
-        self.metrics['info'] = Gauge(   'emby_info',
-                                        'emby info', [
-                                            'server_name',
-                                            'version',
-                                            'local_address',
-                                            'wan_address',
-                                            'id',
-                                            'operating_system'
-                                        ])
-        self.metrics['size'] = Gauge(   'emby_library_size',
-                                        'emby library size',
-                                        [ 'type' ])
-        self.metrics['devices'] = Gauge('emby_devices', 'emby devices',[
-            'name',
-            'id',
-            'username',
-            'user_id',
-            'app_name',
-            'app_version'
+        self.metrics['info'] = Gauge('emby_info', 'emby info', [
+            'server_name', 'version', 'local_address', 'wan_address', 'id',
+            'operating_system'
         ])
+        self.metrics['size'] = Gauge('emby_library_size', 'emby library size',
+                                     ['type'])
+        self.metrics['devices'] = Gauge(
+            'emby_devices', 'emby devices',
+            ['name', 'id', 'username', 'user_id', 'app_name', 'app_version'])
 
-        self.metrics['played'] = Gauge( 'emby_played',
-                                        'emby played item',
-                                        [ 'type' ])
-        self.metrics['favourite'] = Gauge(  'emby_favourite',
-                                            'emby favourite items',
-                                            [ 'type' ])
+        self.metrics['played'] = Gauge('emby_played', 'emby played item',
+                                       ['type'])
+        self.metrics['favourite'] = Gauge('emby_favourite',
+                                          'emby favourite items', ['type'])
 
         self.httpd = None
 
@@ -86,7 +73,6 @@ class emby_exporter:
 
         return current_data
 
-
     def count_list(self, data, current_data={}):
         if isinstance(data, list):
             for i in data:
@@ -100,7 +86,6 @@ class emby_exporter:
             else:
                 current_data[data] += 1
         return current_data
-
 
     def count_stats(self, data):
         stats = dict()
@@ -117,8 +102,8 @@ class emby_exporter:
                     if i in self.count_lists:
                         stats[i] = self.count_list(content, stats[i])
 
-
-                stats['user_data'] = self.count_userdata(m.object_dict['UserData'], stats['user_data'])
+                stats['user_data'] = self.count_userdata(
+                    m.object_dict['UserData'], stats['user_data'])
 
         return stats
 
@@ -132,54 +117,46 @@ class emby_exporter:
             for i in stats[t]:
                 if i == 'user_data':
                     if 'played' in stats[t]['user_data']:
-                        self.metrics['played'].labels(t).set(stats[t]['user_data']['played'])
+                        self.metrics['played'].labels(t).set(
+                            stats[t]['user_data']['played'])
                     if 'isfavourite' in stats[t]['user_data']:
-                        self.metrics['favourite'].labels(t).set(stats[t]['user_data']['isfavourite'])
+                        self.metrics['favourite'].labels(t).set(
+                            stats[t]['user_data']['isfavourite'])
                 else:
-                    options = [ 'type', i.lower()]
+                    options = ['type', i.lower()]
                     if not i in self.metrics:
-                        self.metrics[i] = Gauge('emby_%s' % i.lower(), 'emby %s' % i, options )
+                        self.metrics[i] = Gauge('emby_%s' % i.lower(),
+                                                'emby %s' % i, options)
                     if isinstance(stats[t][i], dict):
                         for g in stats[t][i]:
                             self.metrics[i].labels(t, g).set(stats[t][i][g])
-
 
     def update_metrics(self):
 
         self.emby.update_sync()
         self.info = self.emby.info_sync()
         self.metrics['info'].labels(
-            self.info['ServerName'],
-            self.info['Version'],
-            self.info['LocalAddress'],
-            self.info['WanAddress'],
-            self.info['Id'],
-            self.info['OperatingSystem']).set(1)
+            self.info['ServerName'], self.info['Version'],
+            self.info['LocalAddress'], self.info['WanAddress'],
+            self.info['Id'], self.info['OperatingSystem']).set(1)
 
         data = dict()
-        data['movies']      = self.emby.movies_sync
-        data['series']      = self.emby.series_sync
+        data['movies'] = self.emby.movies_sync
+        data['series'] = self.emby.series_sync
         #data['episodes']    = self.emby.episodes_sync
-        data['albums']      = self.emby.albums_sync
-        data['artists']     = self.emby.artists_sync
+        data['albums'] = self.emby.albums_sync
+        data['artists'] = self.emby.artists_sync
         #data['songs']       = self.emby.songs_sync
 
-
-        devices   = self.emby.devices_sync
+        devices = self.emby.devices_sync
         for d in devices:
-            self.metrics['devices'].labels(
-                d.name,
-                d.id,
-                d.last_user_name,
-                d.last_user_id,
-                d.app_name,
-                d.app_version
-            ).set(1)
+            self.metrics['devices'].labels(d.name, d.id, d.last_user_name,
+                                           d.last_user_id, d.app_name,
+                                           d.app_version).set(1)
         for i in data:
             self.metrics['size'].labels(i).set(len(data[i]))
 
         self.update_stats(data)
-
 
     class _SilentHandler(WSGIRequestHandler):
         """WSGI handler that does not log requests."""
@@ -187,20 +164,16 @@ class emby_exporter:
         def log_message(self, format, *args):
             """Log nothing."""
 
-
     def make_server(self, interface, port):
         server_class = WSGIServer
 
         if ':' in interface:
             if getattr(server_class, 'address_family') == socket.AF_INET:
-                    server_class.address_family = socket.AF_INET6
+                server_class.address_family = socket.AF_INET6
 
         print("* Listening on %s:%s" % (interface, port))
-        self.httpd = make_server(   interface,
-                                    port,
-                                    make_wsgi_app(),
-                                    server_class,
-                                    self._SilentHandler)
+        self.httpd = make_server(interface, port, make_wsgi_app(),
+                                 server_class, self._SilentHandler)
         t = threading.Thread(target=self.httpd.serve_forever)
         t.start()
 
@@ -209,23 +182,25 @@ def main():
     # Ignore warnings becasue of asyncio
     warnings.filterwarnings("ignore")
 
-    parser = argparse.ArgumentParser(
-        description='emby_exporter')
-    parser.add_argument('-e', '--emby',
-        help='emby adress',
-        default='localhost:8096')
-    parser.add_argument('-p', '--port',
+    parser = argparse.ArgumentParser(description='emby_exporter')
+    parser.add_argument(
+        '-e', '--emby', help='emby adress', default='localhost:8096')
+    parser.add_argument(
+        '-p',
+        '--port',
         help='port emby_exporter is listening on',
         default=9123,
         type=int)
-    parser.add_argument('-i', '--interface',
+    parser.add_argument(
+        '-i',
+        '--interface',
         help='interface emby_exporter will listen on',
         default='0.0.0.0')
-    parser.add_argument('-a', '--auth',
-        help='emby api token')
-    parser.add_argument('-u', '--userid',
-        help='emby user id')
-    parser.add_argument('-s', '--interval',
+    parser.add_argument('-a', '--auth', help='emby api token')
+    parser.add_argument('-u', '--userid', help='emby user id')
+    parser.add_argument(
+        '-s',
+        '--interval',
         help='scraping interval in seconds',
         default=15,
         type=int)
@@ -239,6 +214,7 @@ def main():
     while True:
         time.sleep(args.interval)
         emby_ex.update_metrics()
+
 
 if __name__ == '__main__':
     main()
