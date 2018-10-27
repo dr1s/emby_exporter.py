@@ -70,7 +70,7 @@ See [grafana_dashboard.json](grafana_dashboard.json)
 ### manual
     git clone https://github.com/dr1s/emby_exporter.py.git
     docker build -t dr1s/emby_exporter .
-    docker run -d --net=host -t dr1s/emby_exporter
+    docker run -d -p 9123:9123 -t dr1s/emby_exporter
 
 # Usage
 	usage: emby_exporter.py [-h] [-e EMBY] [-p PORT] [-i INTERFACE] [-a AUTH]

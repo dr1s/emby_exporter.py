@@ -1,2 +1,2 @@
 prometheus_client
-embypy
+embypy>=0.4.3.2

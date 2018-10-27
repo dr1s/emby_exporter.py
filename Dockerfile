@@ -1,20 +1,17 @@
 FROM alpine:3.8
-MAINTAINER dr1s
 
 RUN apk add --no-cache python3 && \
     pip3 install --upgrade pip setuptools && \
-    pip3 install virtualenv
+    pip3 install pipenv
 
-WORKDIR /emby_exporter
+WORKDIR /exporter
 
-COPY . /emby_exporter
+COPY emby_exporter/emby_exporter.py emby_exporter.py
+COPY Pipfile Pipfile
+COPY Pipfile.lock Pipfile.lock
 
-RUN apk add --no-cache gcc python3-dev musl-dev git && \
-    virtualenv -p python3 /env && \
-    /env/bin/python3 setup.py install && \
-    rm -rf /emby_exporter && \
-    apk del --no-cache gcc python3-dev musl-dev git
+RUN set -ex && pipenv install --deploy --system
 
-EXPOSE 9312
+EXPOSE 9123
 
-ENTRYPOINT ["/env/bin/emby_exporter"]
+ENTRYPOINT python3 emby_exporter.py
