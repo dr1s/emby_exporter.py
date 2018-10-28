@@ -25,133 +25,12 @@
 import time
 import warnings
 import argparse
-import threading
+from prometheus_metrics import exporter
 from embypy import Emby
-from prometheus_client import Gauge, make_wsgi_app
-from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-__VERSION__ = '0.1.4.dev0'
-
-
-class metric:
-    def __init__(self, name, value):
-        self.name = name
-        self.value = value
-        self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '))
-        self.metric.set(value)
-
-    def update_value(self, value):
-        self.value = value
-        self.metric.set(value)
-
-
-class metric_label:
-    def __init__(self, name, label, value=None):
-        self.name = name
-        self.values = dict()
-        self.label_values = list()
-        self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '),
-                            [label])
-        if value is None:
-            self.update_value(value)
-
-    def update_value(self, value):
-        for label in value:
-            self.values[label] = value[label]
-            self.metric.labels(label).set(value[label])
-            if label not in self.label_values:
-                self.label_values.append(label)
-        for label in self.label_values:
-            if not label in value:
-                self.metric.labels(label).set(0)
-
-
-class metric_labels:
-    def __init__(self, name, labels, values=None):
-        self.name = name
-        self.values = dict()
-        self.labels = labels
-        self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '),
-                            labels)
-        if values is None:
-            self.update_value(values)
-
-    def zero_missing_value(self, value):
-        if isinstance(value, dict):
-            for label in values:
-                value[label] = self.zero_missing_value(value[label])
-        else:
-            value = 0
-        return value
-
-    def update_old_values(self, old_values, values):
-
-        for label in old_values:
-            if not label in values:
-                old_values[label] = self.zero_missing_value(old_values[label])
-            else:
-                if isinstance(old_values[label], dict):
-                    old_values[label] = self.update_old_values(
-                        old_values[label], values[label])
-        return old_values
-
-    def add_new_values(self, old_values, values):
-
-        for label in values:
-            if not isinstance(values[label], dict):
-                old_values[label] = values[label]
-            else:
-                if label in old_values:
-                    old_values[label] = self.add_new_values(
-                        old_values[label], values[label])
-                else:
-                    old_values[label] = values[label]
-
-        return old_values
-
-    def update_metrics(self, values, labels=[]):
-
-        for label in values:
-            labels_tmp = list()
-            for i in labels:
-                labels_tmp.append(i)
-            labels_tmp.append(label)
-
-            if not isinstance(values[label], dict):
-                self.metric.labels(*labels_tmp).set(values[label])
-                labels_tmp.pop()
-            else:
-                self.update_metrics(values[label], labels_tmp)
-
-    def __add_value_dict(self, d, items, value):
-        if len(items) > 1:
-            if not items[0] in d:
-                d[items[0]] = dict()
-            current = items[0]
-            items.pop(0)
-            d[current] = self.__add_value_dict(d[current], items, value)
-        else:
-            d[items[0]] = value
-        return d
-
-    def update_value(self, values):
-        values_tmp = self.values
-        if isinstance(values, list):
-            values_new = dict()
-            for v in values:
-                v_temp = v[:len(v) - 1]
-                metric_value = v[len(v) - 1]
-                values_new = self.__add_value_dict(values_new, v_temp,
-                                                   metric_value)
-                values = values_new
-        values_tmp = self.add_new_values(values_tmp, values)
-        values_tmp = self.update_old_values(values_tmp, values)
-
-        self.update_metrics(values_tmp)
-
-
-class emby_exporter:
+class emby_exporter(exporter):
     def __init__(self, url, api_key, user_id, extended=False):
+        super().__init__()
         self.emby = Emby(
             url,
             api_key=api_key,
@@ -159,32 +38,17 @@ class emby_exporter:
             userid=user_id,
             pass_uid=True)
         self.emby.update_sync()
-        self.metrics = dict()
-        self.info = None
         self.count_lists = ['Genres', 'ProductionYear']
         self.count_user_data = ['Played', 'IsFavorite']
-        self.metrics['info'] = Gauge('emby_info', 'emby info', [
+        self.metrics_handler.add_metric_labels('emby_info', [
             'server_name', 'version', 'local_address', 'wan_address', 'id',
             'operating_system'
+        ], description='information about the emby server')
+        self.metrics_handler.add_metric_labels('emby_devices', [
+            'name', 'id', 'last_user_name', 'last_user_id', 'app_name',
+            'app_version'
         ])
-        self.httpd = None
         self.extended = extended
-
-    def add_update_metric(self, name, value):
-        if not name in self.metrics:
-            self.metrics[name] = metric(name, value)
-        self.metrics[name].update_value(value)
-
-    def add_update_metric_label(self, name, label, value):
-        print(label)
-        if not name in self.metrics:
-            self.metrics[name] = metric_label(name, label, value)
-        self.metrics[name].update_value(value)
-
-    def add_update_metric_labels(self, name, labels, value):
-        if not name in self.metrics:
-            self.metrics[name] = metric_labels(name, labels, value)
-        self.metrics[name].update_value(value)
 
     def count_userdata(self, data, current_data={}):
 
@@ -200,6 +64,7 @@ class emby_exporter:
                             current_data[i][item_type] += 1
         return current_data
 
+    @classmethod
     def update_list(self, data, current_data={}):
         if isinstance(data, list):
             for i in data:
@@ -236,23 +101,23 @@ class emby_exporter:
         stats = self.count_stats(data)
         for t in stats:
             for i in self.count_lists:
-                self.metrics[i] = self.add_update_metric_labels(
+                self.metrics_handler.add_update_metric_labels(
                     'emby_%s' % i.lower(), ['type', i.lower()], stats[i])
 
         user_data = self.count_userdata(data)
         for t in user_data:
-            self.metrics[i] = self.add_update_metric_label(
+            self.metrics_handler.add_update_metric_label(
                 'emby_%s' % t.lower(), 'type', user_data[t])
 
-    def update_metrics(self):
+    def update_info(self):
+        info = self.emby.info_sync()
+        info_data = [[
+            info['ServerName'], info['Version'], info['LocalAddress'],
+            info['WanAddress'], info['Id'], info['OperatingSystem'], 1
+        ]]
+        self.metrics_handler.update_metric('emby_info', info_data)
 
-        self.emby.update_sync()
-        self.info = self.emby.info_sync()
-        self.metrics['info'].labels(
-            self.info['ServerName'], self.info['Version'],
-            self.info['LocalAddress'], self.info['WanAddress'],
-            self.info['Id'], self.info['OperatingSystem']).set(1)
-
+    def update_library(self):
         data = dict()
         data['movies'] = self.emby.movies_sync
         data['series'] = self.emby.series_sync
@@ -263,6 +128,14 @@ class emby_exporter:
             data['episodes'] = self.emby.episodes_sync
             data['songs'] = self.emby.songs_sync
 
+        size_tmp = dict()
+        for i in data:
+            size_tmp[i] = len(data[i])
+        self.metrics_handler.add_update_metric_label('emby_library_size',
+                                                     'type', size_tmp)
+        self.update_stats(data)
+
+    def update_devices(self):
         devices = self.emby.devices_sync
         device_data = list()
         for d in devices:
@@ -270,40 +143,13 @@ class emby_exporter:
                 d.name, d.id, d.last_user_name, d.last_user_id, d.app_name,
                 d.app_version, 1
             ])
-        self.add_update_metric_labels('devices', [
-            'name', 'id', 'last_user_name', 'last_user_id', 'app_name',
-            'app_version'
-        ], device_data)
+        self.metrics_handler.add_update_metric('emby_devices', device_data)
 
-        size_tmp = dict()
-        for i in data:
-            size_tmp[i] = len(data[i])
-        if not 'size' in self.metrics:
-            self.metrics['size'] = metric_label('emby_library_size', 'type',
-                                                size_tmp)
-        self.metrics['size'].update_value(size_tmp)
-
-        self.update_stats(data)
-
-    class _SilentHandler(WSGIRequestHandler):
-        """WSGI handler that does not log requests."""
-
-        def log_message(self, format, *args):
-            """Log nothing."""
-
-    def make_server(self, interface, port):
-        server_class = WSGIServer
-
-        if ':' in interface:
-            if getattr(server_class, 'address_family') == socket.AF_INET:
-                server_class.address_family = socket.AF_INET6
-
-        print("* Listening on %s:%s" % (interface, port))
-        self.httpd = make_server(interface, port, make_wsgi_app(),
-                                 server_class, self._SilentHandler)
-        t = threading.Thread(target=self.httpd.serve_forever)
-        t.start()
-
+    def update_metrics(self):
+        self.emby.update_sync()
+        self.update_info()
+        self.update_library()
+        self.update_devices()
 
 def main():
     # Ignore warnings becasue of asyncio
