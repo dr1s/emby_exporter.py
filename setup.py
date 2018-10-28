@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='emby_exporter',
-    version='0.1.3',
+    version='0.1.4.dev0',
     url='https://github.com/dr1s/emby_exporter.py',
     author='dr1s',
     license='MIT',

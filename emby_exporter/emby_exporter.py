@@ -30,7 +30,7 @@ from embypy import Emby
 from prometheus_client import Gauge, make_wsgi_app
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-__VERSION__ = '0.1.3'
+__VERSION__ = '0.1.4.dev0'
 
 
 class metric:
@@ -46,13 +46,14 @@ class metric:
 
 
 class metric_label:
-    def __init__(self, name, value, label=None):
+    def __init__(self, name, label, value=None):
         self.name = name
         self.values = dict()
         self.label_values = list()
         self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '),
                             [label])
-        self.update_value(value)
+        if value is None:
+            self.update_value(value)
 
     def update_value(self, value):
         for label in value:
@@ -66,21 +67,22 @@ class metric_label:
 
 
 class metric_labels:
-    def __init__(self, name, labels, values):
+    def __init__(self, name, labels, values=None):
         self.name = name
         self.values = dict()
         self.labels = labels
         self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '),
                             labels)
-        self.update_value(values)
+        if values is None:
+            self.update_value(values)
 
-    def zero_missing_value(self, values, key):
-        if isinstance(values, dict):
+    def zero_missing_value(self, value):
+        if isinstance(value, dict):
             for label in values:
-                values[label] = self.zero_missing_value(values[label], label)
+                value[label] = self.zero_missing_value(value[label], label)
         else:
-            values = 0
-        return values
+            value = 0
+        return value
 
     def update_old_values(self, old_values, values):
 
@@ -150,7 +152,7 @@ class metric_labels:
 
 
 class emby_exporter:
-    def __init__(self, url, api_key, user_id):
+    def __init__(self, url, api_key, user_id, extended=False):
         self.emby = Emby(
             url,
             api_key=api_key,
@@ -166,17 +168,19 @@ class emby_exporter:
             'server_name', 'version', 'local_address', 'wan_address', 'id',
             'operating_system'
         ])
-
         self.httpd = None
+        self.extended = extended
+
 
     def add_update_metric(self, name, value):
         if not name in self.metrics:
             self.metrics[name] = metric(name, value)
         self.metrics[name].update_value(value)
 
-    def add_update_metric_label(self, name, value, label=None):
+    def add_update_metric_label(self, name, label, value):
+        print(label)
         if not name in self.metrics:
-            self.metrics[name] = metric_label(name, value, label)
+            self.metrics[name] = metric_label(name, label, value)
         self.metrics[name].update_value(value)
 
     def add_update_metric_labels(self, name, labels, value):
@@ -240,7 +244,7 @@ class emby_exporter:
         user_data = self.count_userdata(data)
         for t in user_data:
             self.metrics[i] = self.add_update_metric_label(
-                'emby_%s' % t.lower(), user_data[t], 'type')
+                'emby_%s' % t.lower(), 'type', user_data[t])
 
     def update_metrics(self):
 
@@ -256,8 +260,10 @@ class emby_exporter:
         data['series'] = self.emby.series_sync
         data['albums'] = self.emby.albums_sync
         data['artists'] = self.emby.artists_sync
-        #data['episodes']    = self.emby.episodes_sync
-        #data['songs']       = self.emby.songs_sync
+
+        if self.extended:
+            data['episodes'] = self.emby.episodes_sync
+            data['songs'] = self.emby.songs_sync
 
         devices = self.emby.devices_sync
         device_data = list()
@@ -275,8 +281,7 @@ class emby_exporter:
         for i in data:
             size_tmp[i] = len(data[i])
         if not 'size' in self.metrics:
-            self.metrics['size'] = metric_label('emby_library_size', size_tmp,
-                                                'type')
+            self.metrics['size'] = metric_label('emby_library_size', 'type', size_tmp)
         self.metrics['size'].update_value(size_tmp)
 
         self.update_stats(data)
@@ -327,6 +332,8 @@ def main():
         help='scraping interval in seconds',
         default=15,
         type=int)
+    parser.add_argument(
+        '-x', '--extended', help='allow processing of episodes and song data')
     args = parser.parse_args()
 
     print('Connecting to emby: %s' % args.emby)
