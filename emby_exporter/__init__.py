@@ -24,7 +24,7 @@
 
 from emby_exporter import main
 
-__VERSION__ = '0.1.4.dev0'
+__VERSION__ = '0.1.4'
 __NAME__ = 'emby_exporter'
 __AUTHOR__ = 'Daniel Schmitz'
 
