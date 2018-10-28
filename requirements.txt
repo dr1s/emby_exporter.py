@@ -1,2 +1,2 @@
-prometheus_client
+prometheus_metrics
 embypy>=0.4.3.2

@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-prometheus_client = "*"
+prometheus_metrics = "*"
 EmbyPy = ">=0.4.3.2"
 
 [dev-packages]
