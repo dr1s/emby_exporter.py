@@ -30,7 +30,7 @@ from embypy import Emby
 from prometheus_client import Gauge, make_wsgi_app
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-__VERSION__ = '0.1.2'
+__VERSION__ = '0.1.3'
 
 
 class metric:
@@ -48,11 +48,8 @@ class metric:
 class metric_label:
     def __init__(self, name, value, label=None):
         self.name = name
-        if not label:
-            label = [*value.keys()][0]
         self.values = dict()
         self.label_values = list()
-        self.label_values.append(label)
         self.metric = Gauge('%s' % name.lower(), name.replace('_', ' '),
                             [label])
         self.update_value(value)
@@ -244,16 +241,6 @@ class emby_exporter:
         for t in user_data:
             self.metrics[i] = self.add_update_metric_label(
                 'emby_%s' % t.lower(), user_data[t], 'type')
-
-        for t in stats:
-            for i in stats[t]:
-                if i == 'user_data':
-                    if 'played' in stats[t]['user_data']:
-                        self.metrics['played'].labels(t).set(
-                            stats[t]['user_data']['played'])
-                    if 'isfavourite' in stats[t]['user_data']:
-                        self.metrics['favourite'].labels(t).set(
-                            stats[t]['user_data']['isfavourite'])
 
     def update_metrics(self):
 
