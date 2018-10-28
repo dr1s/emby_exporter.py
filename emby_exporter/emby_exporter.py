@@ -79,7 +79,7 @@ class metric_labels:
     def zero_missing_value(self, value):
         if isinstance(value, dict):
             for label in values:
-                value[label] = self.zero_missing_value(value[label], label)
+                value[label] = self.zero_missing_value(value[label])
         else:
             value = 0
         return value
@@ -88,8 +88,7 @@ class metric_labels:
 
         for label in old_values:
             if not label in values:
-                old_values[label] = self.zero_missing_value(
-                    old_values[label], label)
+                old_values[label] = self.zero_missing_value(old_values[label])
             else:
                 if isinstance(old_values[label], dict):
                     old_values[label] = self.update_old_values(
@@ -170,7 +169,6 @@ class emby_exporter:
         ])
         self.httpd = None
         self.extended = extended
-
 
     def add_update_metric(self, name, value):
         if not name in self.metrics:
@@ -281,7 +279,8 @@ class emby_exporter:
         for i in data:
             size_tmp[i] = len(data[i])
         if not 'size' in self.metrics:
-            self.metrics['size'] = metric_label('emby_library_size', 'type', size_tmp)
+            self.metrics['size'] = metric_label('emby_library_size', 'type',
+                                                size_tmp)
         self.metrics['size'].update_value(size_tmp)
 
         self.update_stats(data)
